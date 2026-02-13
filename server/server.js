@@ -18,17 +18,25 @@ app.listen(3000, () => {
 })
 
 app.get("/style.css", (req, res) => {
-    res.sendFile(path.resolve("style.css"));
+    res.sendFile(path.resolve("../client/style.css"));
 });
 
 
 
 // GET requests
+app.get("/view-events", (req, res) => {
+    res.sendFile(path.resolve("../client/get.html"));
+});
+
+app.get("/api/events", (req, res) => {
+    const events = getData();
+    res.json(events);
+});
 
 
 // POST requests
 app.get("/create-event", (req, res) => {
-    res.sendFile(path.resolve("create.html"));
+    res.sendFile(path.resolve("../client/create.html"));
 });
 
 app.post("/api/events", (req, res) => {
@@ -42,7 +50,7 @@ app.post("/api/events", (req, res) => {
 
 // DELETE requests
 app.get("/delete-event", (req, res) => {
-    res.sendFile(path.resolve("delete.html"));
+    res.sendFile(path.resolve("../client/delete.html"));
 });
 
 app.delete("/api/events/:id", (req, res) => {
