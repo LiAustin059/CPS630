@@ -30,10 +30,11 @@ The vision for this aplplcaitoin centers around 3 core entities:
   ```
 
 4. Visit http://localhost:3000 to view the application
-
+  ```bash
   /view-events: to see all events
   /create-event: to create a new event
   /delete-event: to delete an event
+  ```
 
 ## Reflection
 Provide a brief overview of the submitted content, and any challenges and/or successes you had.
