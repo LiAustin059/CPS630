@@ -15,7 +15,7 @@ The vision for this aplplcaitoin centers around 3 core entities:
 1. Clone the repository
   ```bash
   git clone https://github.com/LiAustin059/CPS630.git
-  cd cps630
+  cd CPS630
   ```
 
 2. Install dependencies for the server
