@@ -1,33 +1,40 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>View Events</title>
     <link rel="stylesheet" href="/style.css">
 </head>
+
 <body>
     <h1>All Events</h1>
+    <div class="links-container">
+        <a href="/create-event" class="links">Create Event</a>
+        <a href="/delete-event" class="links">Delete Event</a>
+    </div>
     <div id="events-container"></div>
-    
+
     <script>
         async function loadEvents() {
-                const response = await fetch('/api/events');
-                const events = await response.json();
-                const container = document.getElementById('events-container');
-                
-                const eventsList = events.map(event => `
+            const response = await fetch('/api/events');
+            const events = await response.json();
+            const container = document.getElementById('events-container');
+
+            const eventsList = events.map(event => `
                     <div class="event">
                         <h3>${event.eventName || "Unnamed Event"}</h3>
                         <p><strong>ID:</strong> ${event.id}</p>
                         <p><strong>Date:</strong> ${event.eventDate || "Undecided"}</p>
-                        <p><strong>Location:</strong> ${event.eventLocation ||  "Undecided"}</p>
+                        <p><strong>Location:</strong> ${event.eventLocation || "Undecided"}</p>
                     </div>
                 `).join('');
-                
-                container.innerHTML = eventsList;
+
+            container.innerHTML = eventsList;
         }
-        
+
         loadEvents();
     </script>
 </body>
+
 </html>

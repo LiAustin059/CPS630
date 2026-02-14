@@ -29,7 +29,7 @@ The vision for this aplplcaitoin centers around 3 core entities:
   npm run dev
   ```
 
-4. Visit http://localhost:3000 to view the application
+4. Visit http://localhost:3000/view-events to view the application
   ```bash
   /view-events: to see all events
   /create-event: to create a new event

@@ -78,3 +78,21 @@ button:hover {
     background-color:#326383;
     padding: 0 10px;
 }
+
+.links {
+    color: #3498db;
+    text-decoration: none;
+    font-weight: bold;
+    background: white;
+    padding: 8px 15px;
+    border-radius: 5px;
+    margin: 0 10px;
+}
+
+.links-container {
+    display: flex;
+    gap:20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin: 20px;
+}
