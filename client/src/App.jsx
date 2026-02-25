@@ -1,12 +1,7 @@
-function App() {
+import ViewEvents from "./pages/ViewEvents";
 
-  return (
-    <>
-      <div>
-        CPS 630 FRONT END
-      </div>
-    </>
-  )
+function App() {
+  return <ViewEvents />;
 }
 
-export default App
+export default App;

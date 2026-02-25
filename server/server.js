@@ -1,61 +1,96 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import cors from "cors";
+import { fileURLToPath } from "url";
 
-const EVENTS = "./events.json";
-const app = express()
+const app = express();
+// part of setting up the rest api
+app.use(cors());
 app.use(express.json());
 
-const getData = () => JSON.parse(fs.readFileSync(EVENTS, "utf-8"));
-const saveData = (data) => fs.writeFileSync(EVENTS, JSON.stringify(data, null, 2));
+// Fix for __dirname in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Proper absolute path to events.json
+const EVENTS = path.join(__dirname, "events.json");
+
+// Make sure file exists
+if (!fs.existsSync(EVENTS)) {
+  fs.writeFileSync(EVENTS, "[]");
+}
+
+const getData = () =>
+  JSON.parse(fs.readFileSync(EVENTS, "utf-8"));
+
+const saveData = (data) =>
+  fs.writeFileSync(EVENTS, JSON.stringify(data, null, 2));
 
 app.get("/", (req, res) => {
-    res.send("CPS 630 Project!")
-})
+  res.send("CPS 630 Project!");
+});
 
 app.listen(3000, () => {
-    console.log("Server started on port 3000")
-})
-
-app.get("/style.css", (req, res) => {
-    res.sendFile(path.resolve("../client/style.css"));
+  console.log("Server started on port 3000");
 });
 
-
-
-// GET requests
-app.get("/view-events", (req, res) => {
-    res.sendFile(path.resolve("../client/get.html"));
-});
-
+// GET all events
 app.get("/api/events", (req, res) => {
-    const events = getData();
-    res.json(events);
+  res.json(getData());
 });
 
-
-// POST requests
-app.get("/create-event", (req, res) => {
-    res.sendFile(path.resolve("../client/create.html"));
-});
-
+// CREATE event
 app.post("/api/events", (req, res) => {
-    const events = getData();
-    const newEvent = { id: Date.now(), ...req.body };
-    events.push(newEvent);
-    saveData(events);
-    res.status(201).json(newEvent);
+  const events = getData();
+  const newEvent = { id: Date.now(), ...req.body };
+  events.push(newEvent);
+  saveData(events);
+  res.status(201).json(newEvent);
 });
 
-
-// DELETE requests
-app.get("/delete-event", (req, res) => {
-    res.sendFile(path.resolve("../client/delete.html"));
-});
-
+// DELETE event
 app.delete("/api/events/:id", (req, res) => {
-    let events = getData();
-    events = events.filter(e => e.id !== parseInt(req.params.id));
-    saveData(events);
-    res.sendStatus(200);
+  let events = getData();
+  events = events.filter(
+    (e) => e.id !== parseInt(req.params.id)
+  );
+  saveData(events);
+  res.sendStatus(200);
 });
+
+// Get Single Event
+app.get("/api/events/:id", (req, res) => {
+    const events = getData();
+    const event = events.find(
+      (e) => e.id === parseInt(req.params.id)
+    );
+  
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+  
+    res.json(event);
+  });
+
+// Update Event
+app.put("/api/events/:id", (req, res) => {
+    let events = getData();
+    const index = events.findIndex(
+      (e) => e.id === parseInt(req.params.id)
+    );
+  
+    if (index === -1) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+  
+    events[index] = {
+      ...events[index],
+      ...req.body,
+    };
+  
+    saveData(events);
+    res.json(events[index]);
+  });
+
+  
