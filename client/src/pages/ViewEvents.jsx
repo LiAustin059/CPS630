@@ -6,7 +6,7 @@ function ViewEvents() {
   const [filterDate, setFilterDate] = useState("");
 
   useEffect(() => {
-    fetch("http://localhost:3000/api/events")
+    fetch("http://localhost:8080/api/events")
       .then((res) => res.json())
       .then((data) => setEvents(data))
       .catch((err) => console.error(err));
@@ -80,7 +80,7 @@ function ViewEvents() {
         <div className="grid sm:grid-cols-1 md:grid-cols-2 gap-6">
           {filteredEvents.map((event) => (
             <div
-              key={event.id}
+              key={event._id}
               className="bg-[#1e293b] border border-gray-800 rounded-2xl p-6 transition hover:border-indigo-500 hover:shadow-lg"
             >
               <h3 className="text-lg font-semibold">
@@ -96,7 +96,7 @@ function ViewEvents() {
               </p>
 
               <button
-                onClick={() => joinEvent(event.id)}
+                onClick={() => joinEvent(event._id)}
                 className="mt-5 w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-xl text-sm transition"
               >
                 Join Event

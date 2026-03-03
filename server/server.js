@@ -1,96 +1,173 @@
 import express from "express";
-import path from "path";
-import fs from "fs";
 import cors from "cors";
+import mongoose from "mongoose";
+import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
 import { fileURLToPath } from "url";
+import Event from "./models/Event.js";
 
-const app = express();
-// part of setting up the rest api
-app.use(cors());
-app.use(express.json());
+// ENV variables
+dotenv.config();
 
-// Fix for __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Proper absolute path to events.json
-const EVENTS = path.join(__dirname, "events.json");
+const PORT = process.env.PORT || 8080;
+const DB_HOST = process.env.DB_HOST || 'localhost';
+const DB_PORT = process.env.DB_PORT || 27017;
+const MONGODB_URI = process.env.MONGODB_URI || `mongodb://${DB_HOST}:${DB_PORT}/events_app`;
 
-// Make sure file exists
-if (!fs.existsSync(EVENTS)) {
-  fs.writeFileSync(EVENTS, "[]");
-}
+// Initialize app
+const app = express();
 
-const getData = () =>
-  JSON.parse(fs.readFileSync(EVENTS, "utf-8"));
+// Middleware
+app.use(cors());
+app.use(express.json());
 
-const saveData = (data) =>
-  fs.writeFileSync(EVENTS, JSON.stringify(data, null, 2));
+// Seed events function
+const seedEvents = async () => {
+  try {
+    const eventsPath = path.join(__dirname, "events.json");
+    const rawData = fs.readFileSync(eventsPath, "utf-8");
+    const events = JSON.parse(rawData);
+    
+    if (events && events.length > 0) {
+      await Event.insertMany(events);
+      console.log("[INFO] Events seeded successfully");
+    } else {
+      console.log("[WARNING] events.json is empty, skipping seeding");
+    }
+  } catch (err) {
+    console.error("[ERROR] Seeding failed:", err.message);
+  }
+};
 
-app.get("/", (req, res) => {
-  res.send("CPS 630 Project!");
+// Database Connection
+mongoose
+  .connect(MONGODB_URI)
+  .then(async () => {
+    console.log("[INFO] Connected to MongoDB Atlas");
+    
+    // Seeding
+    try {
+      const count = await Event.countDocuments();
+      if (count === 0) {
+        console.log("[INFO] No events found. Going to seed events");
+        await seedEvents();
+      }
+    } catch (err) {
+      console.error("[ERROR] Failed to check for existing events:", err.message);
+    }
+  })
+  .catch((err) => {
+    console.error("[ERROR] MongoDB connection error:", err.message);
+  });
+
+// Monitor connection
+mongoose.connection.on("error", (err) => {
+  console.error("[ERROR] MongoDB runtime error:", err);
 });
 
-app.listen(3000, () => {
-  console.log("Server started on port 3000");
+mongoose.connection.on("disconnected", () => {
+  console.warn("[WARNING] MongoDB disconnected. Attempting to reconnect...");
+});
+
+// Start Server
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
+
+// Routes
+app.get("/", (req, res) => {
+  console.log("[INFO] Home page accessed");
+  res.send("[INFO] CPS 630 Project API is running!");
 });
 
 // GET all events
-app.get("/api/events", (req, res) => {
-  res.json(getData());
+app.get("/api/events", async (req, res) => {
+  console.log("[INFO] All events accessed");
+  try {
+    const events = await Event.find();
+    res.json(events);
+  } catch (err) {
+    console.error("[ERROR] Error fetching events:", err);
+    res.status(500).json({ error: "Server error while fetching events" });
+  }
 });
 
 // CREATE event
-app.post("/api/events", (req, res) => {
-  const events = getData();
-  const newEvent = { id: Date.now(), ...req.body };
-  events.push(newEvent);
-  saveData(events);
-  res.status(201).json(newEvent);
+app.post("/api/events", async (req, res) => {
+  console.log("[INFO] New event created");
+  try {
+    const newEvent = new Event(req.body);
+    const savedEvent = await newEvent.save();
+    console.log("[INFO] Event saved successfully");
+    res.status(201).json(savedEvent);
+  } catch (err) {
+    console.error("[ERROR] Error creating event:", err);
+    res.status(400).json({ error: err.message });
+  }
 });
 
-// DELETE event
-app.delete("/api/events/:id", (req, res) => {
-  let events = getData();
-  events = events.filter(
-    (e) => e.id !== parseInt(req.params.id)
-  );
-  saveData(events);
-  res.sendStatus(200);
-});
-
-// Get Single Event
-app.get("/api/events/:id", (req, res) => {
-    const events = getData();
-    const event = events.find(
-      (e) => e.id === parseInt(req.params.id)
-    );
-  
+// GET single event
+app.get("/api/events/:id", async (req, res) => {
+  console.log("[INFO] Single event accessed");
+  try {
+    const event = await Event.findById(req.params.id);
     if (!event) {
       return res.status(404).json({ error: "Event not found" });
     }
-  
     res.json(event);
-  });
+  } catch (err) {
+    console.error("[ERROR] Error fetching event:", err);
+    if (err.kind === "ObjectId") {
+      return res.status(400).json({ error: "Invalid event ID format" });
+    }
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
-// Update Event
-app.put("/api/events/:id", (req, res) => {
-    let events = getData();
-    const index = events.findIndex(
-      (e) => e.id === parseInt(req.params.id)
+// UPDATE event
+app.put("/api/events/:id", async (req, res) => {
+  console.log("[INFO] Event updated");
+  try {
+    const updatedEvent = await Event.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
     );
-  
-    if (index === -1) {
+    if (!updatedEvent) {
       return res.status(404).json({ error: "Event not found" });
     }
-  
-    events[index] = {
-      ...events[index],
-      ...req.body,
-    };
-  
-    saveData(events);
-    res.json(events[index]);
-  });
+    console.log("[INFO] Event updated successfully");
+    res.json(updatedEvent);
+  } catch (err) {
+    console.error("[ERROR] Error updating event:", err);
+    if (err.kind === "ObjectId") {
+      return res.status(400).json({ error: "Invalid event ID format" });
+    }
+    res.status(400).json({ error: err.message });
+  }
+});
 
-  
+// DELETE event
+app.delete("/api/events/:id", async (req, res) => {
+  console.log("[INFO] Event deleted");
+  try {
+    const deletedEvent = await Event.findByIdAndDelete(req.params.id);
+    if (!deletedEvent) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+    console.log("[INFO] Event deleted successfully");
+    res.json({ message: "Event deleted successfully" });
+  } catch (err) {
+    console.error("[ERROR] Error deleting event:", err.message);
+    if (err.kind === "ObjectId") {
+      return res.status(400).json({ error: "Invalid event ID format" });
+    }
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+
