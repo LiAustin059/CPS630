@@ -23,23 +23,38 @@ The vision for this aplplcaitoin centers around 3 core entities:
   cd server
   npm install
   ```
+
 3. Run MongoDB
-  MacOS: brew services start mongodb-community
+  MacOS: brew services start mongodb/brew/mongodb-community
     - This will start MongoDB as a background process
     - Connect to this instance via the MongoDB Compass application
-    - To stop it, run: brew services stop mongodb-community
-  Windows: not neeeded as its a background process
+    - To stop it, run: brew services stop mongodb/brew/mongodb-community
+  Windows: not needed as its a background process
 
 4. Run the server
+  ```bash
+  npm run start
+  ```
+  - Server will seed the database if there is no data in the database
+
+5. Visit backend server at http://localhost:8080/ to view the server
+
+6. Install dependencies for the client
+  ```bash
+  cd client
+  npm install
+  ```
+
+7. Run the client
   ```bash
   npm run dev
   ```
 
-5. Visit http://localhost:8080/ to view the application
+8. Visit http://localhost:5173/ to view the application
   ```bash
-  /view-events: to see all events
-  /create-event: to create a new event
-  /delete-event: to delete an event
+  /: to see all events
+  /create: to create a new event
+  /delete: to delete an event
   ```
 
 ## Reflection
