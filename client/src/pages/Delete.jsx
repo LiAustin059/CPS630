@@ -10,16 +10,27 @@ const DeleteEvent = () => {
             return;
         }
 
+        // Basic client-side validation for MongoDB ObjectId (24 hex characters)
+        const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+        if (!objectIdRegex.test(id)) {
+            setStatus("Invalid ID format. It should be 24 hex characters.");
+            return;
+        }
+
         try {
-            const response = await fetch(`http://localhost:3000/api/events/${id}`, {
+            const response = await fetch(`http://localhost:8080/api/events/${id}`, {
                 method: 'DELETE'
             });
 
             if (response.ok) {
                 setStatus("Event successfully deleted! 🎉");
                 setId("");
+            } else if (response.status === 404) {
+                setStatus("Event not found. Please check the ID.");
+            } else if (response.status === 400) {
+                setStatus("Invalid ID format. Please use a 24-character ID.");
             } else {
-                setStatus("Failed to delete event. Please check the ID.");
+                setStatus("Failed to delete event. Server returned an error.");
             }
         } catch (err) {
             console.error(err);
@@ -41,12 +52,15 @@ const DeleteEvent = () => {
                 <div>
                     <label className="block text-sm font-medium text-gray-400 mb-2">Event ID</label>
                     <input 
-                        type="number" 
-                        placeholder="e.g. 123" 
+                        type="text" 
+                        placeholder="e.g. 64a8f1..." 
                         value={id}
                         onChange={(e) => setId(e.target.value)}
-                        className="w-full bg-[#0f172a] border border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                        className="w-full bg-[#0f172a] border border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition font-mono"
                     />
+                    <p className="text-xs text-gray-500 mt-2">
+                        You can find the ID for any event on the <span className="text-indigo-400">Explore</span> page.
+                    </p>
                 </div>
 
                 <button 

@@ -89,6 +89,7 @@ app.get("/api/events", async (req, res) => {
   console.log("[INFO] All events accessed");
   try {
     const events = await Event.find();
+    console.log("[INFO] Events fetched successfully", events);
     res.json(events);
   } catch (err) {
     console.error("[ERROR] Error fetching events:", err);
