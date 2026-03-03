@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 function ViewEvents() {
   const [events, setEvents] = useState([]);
@@ -28,44 +29,29 @@ function ViewEvents() {
     return matchesSearch && matchesDate;
   });
 
-  const joinEvent = (id) => {
+  const joinEvent = () => {
     alert("You joined this event 🎉");
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-gray-200">
+    <div className="max-w-5xl mx-auto px-4 py-10">
       
-      {/* NAVBAR */}
-      <nav className="border-b border-gray-800 px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-semibold tracking-tight">
-          Find Events Around You
-        </h1>
-        {/* could expand to have other pages for creating an event and having their own profile */}
-        <div className="hidden md:flex gap-6 text-sm text-gray-400">
-          <span className="hover:text-white cursor-pointer">Explore</span>
-          <span className="hover:text-white cursor-pointer">Create</span>
-          <span className="hover:text-white cursor-pointer">Profile</span>
-        </div>
-      </nav>
-
-      <div className="max-w-5xl mx-auto px-4 py-10">
-        
-        {/* Header */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-semibold">Discover Events</h2>
-          <p className="text-gray-400 mt-2">
-            Find your people. Be social.
-          </p>
-        </div>
+      {/* Header */}
+      <div className="mb-8">
+        <h2 className="text-3xl font-semibold">Discover Events</h2>
+        <p className="text-gray-400 mt-2">
+          Find your people. Be social.
+        </p>
+      </div>
 
         {/* Search + Filter */}
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
+        <div className="flex flex-col md:flex-row gap-20 mb-8">
           <input
             type="text"
             placeholder="Search by name or location..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 bg-[#1e293b] border border-gray-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className=" bg-[#1e293b] border border-gray-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
 
           <input
@@ -97,7 +83,7 @@ function ViewEvents() {
 
               <button
                 onClick={() => joinEvent(event.id)}
-                className="mt-5 w-full bg-indigo-600 hover:bg-indigo-500 text-white py-2 rounded-xl text-sm transition"
+                className="mt-5 w-full bg-[#1a1a1a] hover:bg-indigo-500 text-white py-2 rounded-xl text-sm transition"
               >
                 Join Event
               </button>
@@ -109,8 +95,7 @@ function ViewEvents() {
           <div className="text-center text-gray-500 mt-16">
             No events match your search.
           </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
