@@ -7,7 +7,7 @@ function ViewEvents() {
   const [filterDate, setFilterDate] = useState("");
 
   useEffect(() => {
-    fetch("http://localhost:3000/api/events")
+    fetch("http://localhost:8080/api/events")
       .then((res) => res.json())
       .then((data) => setEvents(data))
       .catch((err) => console.error(err));
