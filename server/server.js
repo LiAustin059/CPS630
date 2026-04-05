@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { Server } from "socket.io";
 import Event from "./models/Event.js";
 
 // ENV variables
@@ -74,8 +75,25 @@ mongoose.connection.on("disconnected", () => {
 });
 
 // Start Server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+});
+
+// Initialize Socket.io
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:5173", // Vite dev server
+    methods: ["GET", "POST"]
+  }
+});
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  console.log('A user connected:', socket.id);
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
 });
 
 // Routes
@@ -104,6 +122,10 @@ app.post("/api/events", async (req, res) => {
     const newEvent = new Event(req.body);
     const savedEvent = await newEvent.save();
     console.log("[INFO] Event saved successfully");
+
+    // Emit real-time event to all connected clients
+    io.emit('eventCreated', savedEvent);
+
     res.status(201).json(savedEvent);
   } catch (err) {
     console.error("[ERROR] Error creating event:", err);
@@ -142,6 +164,10 @@ app.put("/api/events/:id", async (req, res) => {
       return res.status(404).json({ error: "Event not found" });
     }
     console.log("[INFO] Event updated successfully");
+
+    // Emit real-time event to all connected clients
+    io.emit('eventUpdated', updatedEvent);
+
     res.json(updatedEvent);
   } catch (err) {
     console.error("[ERROR] Error updating event:", err);
@@ -161,6 +187,10 @@ app.delete("/api/events/:id", async (req, res) => {
       return res.status(404).json({ error: "Event not found" });
     }
     console.log("[INFO] Event deleted successfully");
+
+    // Emit real-time event to all connected clients
+    io.emit('eventDeleted', deletedEvent._id);
+
     res.json({ message: "Event deleted successfully" });
   } catch (err) {
     console.error("[ERROR] Error deleting event:", err.message);

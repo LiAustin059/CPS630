@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Copy, Check, MapPin, Calendar, Users } from "lucide-react";
+import io from "socket.io-client";
 
 function ViewEvents() {
   const [events, setEvents] = useState([]);
@@ -12,6 +13,38 @@ function ViewEvents() {
       .then((res) => res.json())
       .then((data) => setEvents(data))
       .catch((err) => console.error(err));
+
+    // Connect to Socket.io server
+    const socket = io("http://localhost:8080");
+
+    // Listen for new event creation
+    socket.on('eventCreated', (newEvent) => {
+      console.log('New event received:', newEvent);
+      setEvents((prevEvents) => [...prevEvents, newEvent]);
+    });
+
+    // Listen for event updates
+    socket.on('eventUpdated', (updatedEvent) => {
+      console.log('Event updated:', updatedEvent);
+      setEvents((prevEvents) =>
+        prevEvents.map((event) =>
+          event._id === updatedEvent._id ? updatedEvent : event
+        )
+      );
+    });
+
+    // Listen for event deletions
+    socket.on('eventDeleted', (deletedId) => {
+      console.log('Event deleted:', deletedId);
+      setEvents((prevEvents) =>
+        prevEvents.filter((event) => event._id !== deletedId)
+      );
+    });
+
+    // Cleanup on unmount
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   const copyToClipboard = (id) => {
