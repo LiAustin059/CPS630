@@ -61,9 +61,17 @@ Future Considerations:
 8. Visit http://localhost:5173/ to view the application
   ```bash
   /: to see all events
+  /login: to sign in
+  /register: to create an account
+  /profile: to view your own events
   /create: to create a new event
   /delete: to delete an event
   ```
+
+### Authentication
+The homepage stays public so anyone can browse events without logging in.
+Creating events, joining events, and deleting events now require a signed-in account.
+Each user has their own profile data, including events they created and events they joined.
 
 ### server.js
 This is the primary server file and the entry point for the backend server. 
