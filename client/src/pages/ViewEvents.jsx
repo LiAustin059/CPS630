@@ -180,13 +180,22 @@ function ViewEvents() {
                 </code>
               </div>
 
-              <button
-                onClick={() => joinEvent(event._id)}
-                disabled={isJoinedByUser(event)}
-                className="w-full bg-[#0f172a] border border-gray-700 hover:bg-indigo-600 hover:border-indigo-600 disabled:cursor-not-allowed disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-medium transition-all active:scale-[0.98]"
-              >
-                {user ? (isJoinedByUser(event) ? "Already joined" : "Sign up for event") : "Sign in to sign up"}
-              </button>
+              {isJoinedByUser(event) ? (
+                <button
+                  onClick={() => navigate(`/events/${event._id}/chat`)}
+                  className="w-full bg-indigo-600 border border-indigo-500 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-sm font-medium transition-all active:scale-[0.98]"
+                >
+                  Open Event Chat
+                </button>
+              ) : (
+                <button
+                  onClick={() => joinEvent(event._id)}
+                  disabled={isJoinedByUser(event)}
+                  className="w-full bg-[#0f172a] border border-gray-700 hover:bg-indigo-600 hover:border-indigo-600 disabled:cursor-not-allowed disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-medium transition-all active:scale-[0.98]"
+                >
+                  {user ? "Sign up for event" : "Sign in to sign up"}
+                </button>
+              )}
             </div>
           ))}
         </div>

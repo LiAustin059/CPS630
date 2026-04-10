@@ -4,6 +4,9 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
+import http from "http";
+import jwt from "jsonwebtoken";
+import { Server } from "socket.io";
 import { fileURLToPath } from "url";
 import bcrypt from "bcryptjs";
 import User from "./models/User.js";
@@ -12,6 +15,8 @@ import { requireAuth, signToken } from "./middleware/auth.js";
 
 // ENV variables
 dotenv.config();
+
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +32,77 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
+
+const eventChats = new Map();
+
+io.use((socket, next) => {
+  const authHeader = socket.handshake.auth?.token || socket.handshake.headers?.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
+
+  if (!token) {
+    return next(new Error("Authentication required"));
+  }
+
+  try {
+    socket.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch (err) {
+    next(new Error("Invalid or expired session"));
+  }
+});
+
+io.on("connection", (socket) => {
+  console.log(`[INFO] Socket connected: ${socket.id} (${socket.user.username})`);
+
+  socket.on("joinEventChat", (eventId) => {
+    if (!eventId) {
+      socket.emit("chatError", "Event ID is required to join chat.");
+      return;
+    }
+
+    socket.join(eventId);
+    const history = eventChats.get(eventId) || [];
+    socket.emit("chatHistory", history);
+  });
+
+  socket.on("sendChatMessage", ({ eventId, text }) => {
+    if (!eventId || !text?.trim()) {
+      return;
+    }
+
+    const message = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      eventId,
+      text: text.trim(),
+      sender: {
+        id: socket.user.id,
+        username: socket.user.username,
+      },
+      createdAt: new Date().toISOString(),
+    };
+
+    const history = eventChats.get(eventId) || [];
+    history.push(message);
+    if (history.length > 100) {
+      history.shift();
+    }
+    eventChats.set(eventId, history);
+
+    io.to(eventId).emit("chatMessage", message);
+  });
+
+  socket.on("disconnect", () => {
+    console.log(`[INFO] Socket disconnected: ${socket.id}`);
+  });
+});
 
 const sanitizeUser = (user) => ({
   id: user._id.toString(),
@@ -102,7 +178,7 @@ mongoose.connection.on("disconnected", () => {
 });
 
 // Start Server
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
 
@@ -281,7 +357,10 @@ app.post("/api/events/:id/join", requireAuth, async (req, res) => {
 app.get("/api/events/:id", async (req, res) => {
   console.log("[INFO] Single event accessed");
   try {
-    const event = await Event.findById(req.params.id);
+    const event = await Event.findById(req.params.id)
+      .populate("owner", "username email")
+      .populate("attendees", "username email");
+
     if (!event) {
       return res.status(404).json({ error: "Event not found" });
     }
