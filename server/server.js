@@ -7,7 +7,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import bcrypt from "bcryptjs";
 import User from "./models/User.js";
-import { Server } from "socket.io";
 import Event from "./models/Event.js";
 import { requireAuth, signToken } from "./middleware/auth.js";
 
@@ -103,7 +102,7 @@ mongoose.connection.on("disconnected", () => {
 });
 
 // Start Server
-const server = app.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
 
@@ -235,10 +234,6 @@ app.post("/api/events", requireAuth, async (req, res) => {
     });
 
     console.log("[INFO] Event saved successfully");
-
-    // Emit real-time event to all connected clients
-    io.emit('eventCreated', savedEvent);
-
     res.status(201).json(savedEvent);
   } catch (err) {
     console.error("[ERROR] Error creating event:", err);
@@ -319,10 +314,6 @@ app.put("/api/events/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Event not found" });
     }
     console.log("[INFO] Event updated successfully");
-
-    // Emit real-time event to all connected clients
-    io.emit('eventUpdated', updatedEvent);
-
     res.json(updatedEvent);
   } catch (err) {
     console.error("[ERROR] Error updating event:", err);
