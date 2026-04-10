@@ -1,14 +1,20 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Copy, Check, MapPin, Calendar, Users } from "lucide-react";
+import { apiFetch } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 
 function ViewEvents() {
+  const navigate = useNavigate();
+  const { user, refreshUser } = useAuth();
   const [events, setEvents] = useState([]);
   const [search, setSearch] = useState("");
   const [filterDate, setFilterDate] = useState("");
   const [copiedId, setCopiedId] = useState(null);
+  const [joinMessage, setJoinMessage] = useState("");
 
   useEffect(() => {
-    fetch("http://localhost:8080/api/events")
+    apiFetch("/api/events")
       .then((res) => res.json())
       .then((data) => setEvents(data))
       .catch((err) => console.error(err));
@@ -36,8 +42,47 @@ function ViewEvents() {
     return matchesSearch && matchesDate;
   });
 
-  const joinEvent = () => {
-    alert("You joined this event 🎉");
+  const isOwnedByUser = (event) => {
+    if (!user || !event.owner) {
+      return false;
+    }
+
+    return event.owner._id === user.id || event.owner.id === user.id;
+  };
+
+  const isJoinedByUser = (event) => {
+    if (!user || !Array.isArray(event.attendees)) {
+      return false;
+    }
+
+    return event.attendees.some((attendee) => attendee?._id === user.id || attendee?.id === user.id);
+  };
+
+  const joinEvent = async (eventId) => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const response = await apiFetch(`/api/events/${eventId}/join`, {
+        method: "POST",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to join event");
+      }
+
+      setEvents((currentEvents) =>
+        currentEvents.map((event) => (event._id === data._id ? data : event))
+      );
+      setJoinMessage("You joined the event.");
+      refreshUser().catch(() => null);
+    } catch (error) {
+      setJoinMessage(error.message);
+    }
   };
 
   return (
@@ -49,6 +94,16 @@ function ViewEvents() {
         <p className="text-gray-400 mt-2">
           Find your people. Be social.
         </p>
+        {!user && (
+          <div className="mt-4 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-3 text-sm text-indigo-200">
+            Browsing is open. Sign in to join events or manage your own.
+          </div>
+        )}
+        {joinMessage && (
+          <div className="mt-4 rounded-2xl border border-gray-800 bg-[#111827] px-4 py-3 text-sm text-gray-300">
+            {joinMessage}
+          </div>
+        )}
       </div>
 
         {/* Search + Filter */}
@@ -98,6 +153,19 @@ function ViewEvents() {
                 </button>
               </div>
 
+              <div className="mb-4 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.2em]">
+                {isOwnedByUser(event) && (
+                  <span className="rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2.5 py-1 text-indigo-300">
+                    Your event
+                  </span>
+                )}
+                {isJoinedByUser(event) && (
+                  <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-emerald-300">
+                    Joined
+                  </span>
+                )}
+              </div>
+
               <div className="space-y-2 mb-6 text-sm">
                 <p className="flex items-center gap-2 text-gray-400">
                   <MapPin className="w-4 h-4 text-indigo-500" />
@@ -112,12 +180,22 @@ function ViewEvents() {
                 </code>
               </div>
 
-              <button
-                onClick={() => joinEvent(event._id)}
-                className="w-full bg-[#0f172a] border border-gray-700 hover:bg-indigo-600 hover:border-indigo-600 text-white py-2.5 rounded-xl text-sm font-medium transition-all active:scale-[0.98]"
-              >
-                Join Event
-              </button>
+              {isJoinedByUser(event) ? (
+                <button
+                  onClick={() => navigate(`/events/${event._id}/chat`)}
+                  className="w-full bg-indigo-600 border border-indigo-500 hover:bg-indigo-500 text-white py-2.5 rounded-xl text-sm font-medium transition-all active:scale-[0.98]"
+                >
+                  Open Event Chat
+                </button>
+              ) : (
+                <button
+                  onClick={() => joinEvent(event._id)}
+                  disabled={isJoinedByUser(event)}
+                  className="w-full bg-[#0f172a] border border-gray-700 hover:bg-indigo-600 hover:border-indigo-600 disabled:cursor-not-allowed disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-medium transition-all active:scale-[0.98]"
+                >
+                  {user ? "Sign up for event" : "Sign in to sign up"}
+                </button>
+              )}
             </div>
           ))}
         </div>

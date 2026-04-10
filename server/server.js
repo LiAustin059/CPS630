@@ -4,11 +4,19 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
+import http from "http";
+import jwt from "jsonwebtoken";
+import { Server } from "socket.io";
 import { fileURLToPath } from "url";
+import bcrypt from "bcryptjs";
+import User from "./models/User.js";
 import Event from "./models/Event.js";
+import { requireAuth, signToken } from "./middleware/auth.js";
 
 // ENV variables
 dotenv.config();
+
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,6 +32,102 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
+
+const eventChats = new Map();
+
+io.use((socket, next) => {
+  const authHeader = socket.handshake.auth?.token || socket.handshake.headers?.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
+
+  if (!token) {
+    return next(new Error("Authentication required"));
+  }
+
+  try {
+    socket.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch (err) {
+    next(new Error("Invalid or expired session"));
+  }
+});
+
+io.on("connection", (socket) => {
+  console.log(`[INFO] Socket connected: ${socket.id} (${socket.user.username})`);
+
+  socket.on("joinEventChat", (eventId) => {
+    if (!eventId) {
+      socket.emit("chatError", "Event ID is required to join chat.");
+      return;
+    }
+
+    socket.join(eventId);
+    const history = eventChats.get(eventId) || [];
+    socket.emit("chatHistory", history);
+  });
+
+  socket.on("sendChatMessage", ({ eventId, text }) => {
+    if (!eventId || !text?.trim()) {
+      return;
+    }
+
+    const message = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      eventId,
+      text: text.trim(),
+      sender: {
+        id: socket.user.id,
+        username: socket.user.username,
+      },
+      createdAt: new Date().toISOString(),
+    };
+
+    const history = eventChats.get(eventId) || [];
+    history.push(message);
+    if (history.length > 100) {
+      history.shift();
+    }
+    eventChats.set(eventId, history);
+
+    io.to(eventId).emit("chatMessage", message);
+  });
+
+  socket.on("disconnect", () => {
+    console.log(`[INFO] Socket disconnected: ${socket.id}`);
+  });
+});
+
+const sanitizeUser = (user) => ({
+  id: user._id.toString(),
+  username: user.username,
+  email: user.email,
+  createdEvents: user.createdEvents || [],
+  joinedEvents: user.joinedEvents || [],
+});
+
+const populateEvent = () =>
+  Event.find().populate("owner", "username email").populate("attendees", "username email");
+
+const ensureEventOwner = async (eventId, userId) => {
+  const event = await Event.findById(eventId);
+
+  if (!event) {
+    return { error: { status: 404, message: "Event not found" } };
+  }
+
+  if (!event.owner || event.owner.toString() !== userId) {
+    return { error: { status: 403, message: "You can only change your own events" } };
+  }
+
+  return { event };
+};
 
 // Seed events function
 const seedEvents = async () => {
@@ -74,8 +178,91 @@ mongoose.connection.on("disconnected", () => {
 });
 
 // Start Server
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+});
+
+// Auth routes
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const { username, email, password } = req.body;
+
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: "Username, email, and password are required" });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedUsername = username.trim();
+
+    const existingUser = await User.findOne({
+      $or: [{ email: normalizedEmail }, { username: normalizedUsername }],
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ error: "An account with that email or username already exists" });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      username: normalizedUsername,
+      email: normalizedEmail,
+      passwordHash,
+      createdEvents: [],
+      joinedEvents: [],
+    });
+
+    const token = signToken(user);
+    res.status(201).json({ token, user: sanitizeUser(user) });
+  } catch (error) {
+    console.error("[ERROR] Registration failed:", error);
+    res.status(500).json({ error: "Unable to register user" });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail }).select("+passwordHash");
+
+    if (!user) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    const passwordMatches = await bcrypt.compare(password, user.passwordHash);
+
+    if (!passwordMatches) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    const token = signToken(user);
+    res.json({ token, user: sanitizeUser(user) });
+  } catch (error) {
+    console.error("[ERROR] Login failed:", error);
+    res.status(500).json({ error: "Unable to log in" });
+  }
+});
+
+app.get("/api/auth/me", requireAuth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id)
+      .populate("createdEvents")
+      .populate("joinedEvents");
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ user: sanitizeUser(user) });
+  } catch (error) {
+    console.error("[ERROR] Failed to load profile:", error);
+    res.status(500).json({ error: "Unable to load user profile" });
+  }
 });
 
 // Routes
@@ -88,7 +275,14 @@ app.get("/", (req, res) => {
 app.get("/api/events", async (req, res) => {
   console.log("[INFO] All events accessed");
   try {
-    const events = await Event.find();
+    let events = await populateEvent();
+
+    // Keep the public listing populated even after an empty DB reset.
+    if (!events.length) {
+      await seedEvents();
+      events = await populateEvent();
+    }
+
     console.log("[INFO] Events fetched successfully", events);
     res.json(events);
   } catch (err) {
@@ -98,11 +292,23 @@ app.get("/api/events", async (req, res) => {
 });
 
 // CREATE event
-app.post("/api/events", async (req, res) => {
+app.post("/api/events", requireAuth, async (req, res) => {
   console.log("[INFO] New event created");
   try {
-    const newEvent = new Event(req.body);
+    const newEvent = new Event({
+      ...req.body,
+      owner: req.user.id,
+      attendees: [req.user.id],
+    });
     const savedEvent = await newEvent.save();
+
+    await User.findByIdAndUpdate(req.user.id, {
+      $addToSet: {
+        createdEvents: savedEvent._id,
+        joinedEvents: savedEvent._id,
+      },
+    });
+
     console.log("[INFO] Event saved successfully");
     res.status(201).json(savedEvent);
   } catch (err) {
@@ -111,11 +317,50 @@ app.post("/api/events", async (req, res) => {
   }
 });
 
+// JOIN event
+app.post("/api/events/:id/join", requireAuth, async (req, res) => {
+  console.log("[INFO] Event join requested");
+  try {
+    const event = await Event.findById(req.params.id);
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    const attendees = Array.isArray(event.attendees) ? event.attendees : [];
+    const alreadyJoined = attendees.some((attendeeId) => attendeeId.toString() === req.user.id);
+
+    if (!alreadyJoined) {
+      event.attendees = [...attendees, req.user.id];
+      await event.save();
+
+      await User.findByIdAndUpdate(req.user.id, {
+        $addToSet: { joinedEvents: event._id },
+      });
+    }
+
+    const populatedEvent = await Event.findById(req.params.id)
+      .populate("owner", "username email")
+      .populate("attendees", "username email");
+
+    res.json(populatedEvent);
+  } catch (err) {
+    console.error("[ERROR] Error joining event:", err);
+    if (err.kind === "ObjectId") {
+      return res.status(400).json({ error: "Invalid event ID format" });
+    }
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // GET single event
 app.get("/api/events/:id", async (req, res) => {
   console.log("[INFO] Single event accessed");
   try {
-    const event = await Event.findById(req.params.id);
+    const event = await Event.findById(req.params.id)
+      .populate("owner", "username email")
+      .populate("attendees", "username email");
+
     if (!event) {
       return res.status(404).json({ error: "Event not found" });
     }
@@ -130,9 +375,15 @@ app.get("/api/events/:id", async (req, res) => {
 });
 
 // UPDATE event
-app.put("/api/events/:id", async (req, res) => {
+app.put("/api/events/:id", requireAuth, async (req, res) => {
   console.log("[INFO] Event updated");
   try {
+    const ownershipCheck = await ensureEventOwner(req.params.id, req.user.id);
+
+    if (ownershipCheck.error) {
+      return res.status(ownershipCheck.error.status).json({ error: ownershipCheck.error.message });
+    }
+
     const updatedEvent = await Event.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -153,14 +404,25 @@ app.put("/api/events/:id", async (req, res) => {
 });
 
 // DELETE event
-app.delete("/api/events/:id", async (req, res) => {
+app.delete("/api/events/:id", requireAuth, async (req, res) => {
   console.log("[INFO] Event deleted");
   try {
-    const deletedEvent = await Event.findByIdAndDelete(req.params.id);
-    if (!deletedEvent) {
-      return res.status(404).json({ error: "Event not found" });
+    const ownershipCheck = await ensureEventOwner(req.params.id, req.user.id);
+
+    if (ownershipCheck.error) {
+      return res.status(ownershipCheck.error.status).json({ error: ownershipCheck.error.message });
     }
+
+    const deletedEvent = await Event.findByIdAndDelete(req.params.id);
     console.log("[INFO] Event deleted successfully");
+
+    await User.findByIdAndUpdate(req.user.id, {
+      $pull: {
+        createdEvents: deletedEvent._id,
+        joinedEvents: deletedEvent._id,
+      },
+    });
+
     res.json({ message: "Event deleted successfully" });
   } catch (err) {
     console.error("[ERROR] Error deleting event:", err.message);
