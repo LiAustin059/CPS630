@@ -3,7 +3,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
-import { ArrowLeft, MessageCircle, Send, Users } from "lucide-react";
+import { ArrowLeft, MessageCircle, Send, Users, ShieldAlert, CircleUser } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import ChatMessage from "../components/chat/ChatMessage";
 
 const EventChat = () => {
   const { id } = useParams();
@@ -15,7 +19,7 @@ const EventChat = () => {
   const [socket, setSocket] = useState(null);
   const [error, setError] = useState("");
   const [isLoaded, setIsLoaded] = useState(false);
-  const messagesEndRef = useRef(null);
+  const scrollRef = useRef(null);
 
   useEffect(() => {
     if (!id) return;
@@ -70,8 +74,12 @@ const EventChat = () => {
     };
   }, [id, user]);
 
+  // Scroll to bottom whenever messages update
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (scrollRef.current) {
+      const scrollContainer = scrollRef.current;
+      scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    }
   }, [messages]);
 
   const isJoined = () => {
@@ -106,101 +114,96 @@ const EventChat = () => {
 
   if (!user) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-10 text-white">
-        <button
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 text-indigo-300 hover:text-white mb-6"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back
-        </button>
-        <div className="rounded-3xl border border-gray-800 bg-[#111827] p-8">
-          <p className="text-lg font-semibold">Sign in to use event chat</p>
-          <p className="mt-3 text-gray-400">Event chat is only available to authenticated users who are participants of this event.</p>
-        </div>
+      <div className="max-w-4xl mx-auto py-10">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-6 -ml-4 px-4 text-muted-foreground">
+          <ArrowLeft className="w-4 h-4 mr-2" /> Back
+        </Button>
+        <Card className="text-center py-12 px-4 shadow-sm bg-card border-muted/50">
+           <ShieldAlert className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Sign in to use event chat</h2>
+          <p className="text-muted-foreground">Event chat is only available to authenticated participants.</p>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10">
-      <button
-        onClick={() => navigate(-1)}
-        className="inline-flex items-center gap-2 text-indigo-300 hover:text-white mb-6"
-      >
-        <ArrowLeft className="w-4 h-4" /> Back
-      </button>
-
-      <div className="rounded-3xl border border-gray-800 bg-[#111827] p-8 mb-8">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3 text-indigo-300">
-            <MessageCircle className="w-5 h-5" />
-            <h1 className="text-3xl font-semibold text-white">{title}</h1>
-          </div>
-          {subtitle && <p className="text-gray-400">{subtitle}</p>}
-          <p className="text-sm text-gray-400 mt-1">Chat with other attendees who joined this event.</p>
-        </div>
+    <div className="max-w-5xl mx-auto flex flex-col h-[calc(100vh-6rem)] relative animate-in fade-in duration-500 pb-4">
+      {/* Top Navigation */}
+      <div className="pt-6 pb-4 shrink-0 flex items-center justify-between">
+         <Button variant="ghost" onClick={() => navigate(-1)} className="-ml-3 px-3 text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
+         </Button>
       </div>
 
-      {!isJoined() ? (
-        <div className="rounded-3xl border border-gray-800 bg-[#111827] p-8">
-          <div className="flex items-center gap-3 text-indigo-300 mb-4">
-            <Users className="w-5 h-5" />
-            <h2 className="text-xl font-semibold text-white">Access restricted</h2>
-          </div>
-          <p className="text-gray-400">Only event participants can view and post messages. Join the event first to gain access.</p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {error && (
-            <div className="rounded-2xl border border-red-600 bg-red-500/10 p-4 text-red-200">
-              {error}
-            </div>
-          )}
+      {/* Main Chat Interface */}
+      <Card className="flex flex-col h-[calc(100vh-12rem)] min-h-[500px] glass-card border-transparent bg-transparent relative overflow-hidden group z-10 transition-shadow">
+         <div 
+            className="absolute top-0 left-0 right-0 h-[1px] opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+            style={{
+               background: 'linear-gradient(90deg, transparent, rgba(94,106,210,0.5), transparent)'
+            }}
+         />
+         {/* Chat Header */}
+         <div className="flex items-center p-4 border-b border-white/[0.06] bg-white/[0.02] shrink-0 z-10 relative">
+            <h1 className="text-xl font-bold flex items-center gap-2 tracking-tight text-foreground">
+               <MessageCircle className="w-5 h-5 text-primary" /> {title}
+            </h1>
+            {subtitle && <p className="text-sm text-muted-foreground ml-7 font-medium tracking-wide mt-0.5">{subtitle}</p>}
+         </div>
 
-          <div className="rounded-3xl border border-gray-800 bg-[#111827] p-6 h-[60vh] overflow-hidden">
-            <div className="h-full overflow-y-auto pr-2">
-              {messages.length === 0 ? (
-                <div className="flex h-full items-center justify-center text-gray-500 text-sm">
-                  No chat messages yet. Say hello to the group.
-                </div>
-              ) : (
-                messages.map((message) => {
-                  const isSelf = message.sender?.id === user.id;
-                  return (
-                    <div
-                      key={message.id}
-                      className={`mb-4 flex ${isSelf ? "justify-end" : "justify-start"}`}
-                    >
-                      <div className={`max-w-[85%] rounded-3xl border px-4 py-3 ${isSelf ? "bg-indigo-600 text-white" : "bg-[#0f172a] border-gray-800 text-gray-200"}`}>
-                        <div className="text-xs text-gray-400 mb-2">
-                          {message.sender?.username || "Unknown"} • {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </div>
-                        <div className="whitespace-pre-wrap text-sm">{message.text}</div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-              <div ref={messagesEndRef} />
+         {!isJoined() ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-muted/5">
+               <div className="bg-muted p-4 rounded-full mb-4">
+                  <Users className="w-8 h-8 text-muted-foreground" />
+               </div>
+               <h2 className="text-xl font-semibold mb-2">Access restricted</h2>
+               <p className="text-muted-foreground max-w-md">
+                 Only event participants can view and post messages here. Go back and join the event first to gain access.
+               </p>
             </div>
-          </div>
+         ) : (
+            <>
+               {/* Messages Area */}
+               <div 
+                 ref={scrollRef} 
+                 className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 scroll-smooth bg-card"
+               >
+                  {error && (
+                     <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive font-medium mx-auto max-w-md text-center mb-6">
+                        {error}
+                     </div>
+                  )}
 
-          <form onSubmit={sendMessage} className="flex gap-3">
-            <input
-              className="flex-1 rounded-3xl border border-gray-800 bg-[#0f172a] px-4 py-3 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="Type your message..."
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-            />
-            <button
-              type="submit"
-              className="inline-flex items-center gap-2 rounded-3xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-500"
-            >
-              <Send className="w-4 h-4" /> Send
-            </button>
-          </form>
-        </div>
-      )}
+                  {messages.length === 0 ? (
+                     <div className="flex h-full items-center justify-center text-muted-foreground text-sm italic">
+                        No chat messages yet. Introduce yourself!
+                     </div>
+                  ) : (
+                     messages.map((message) => {
+                        const isSelf = message.sender?.id === user.id;
+                        return <ChatMessage key={message.id} message={message} isSelf={isSelf} />;
+                     })
+                  )}
+               </div>
+
+               {/* Input Area */}
+               <div className="p-4 border-t border-white/[0.06] bg-white/[0.02] shrink-0 z-10 relative mt-auto">
+                  <form onSubmit={sendMessage} className="flex gap-3 max-w-4xl mx-auto">
+                     <Input
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        placeholder="Message the event channel..."
+                        className="flex-1 bg-[#0F0F12] border-white/10 text-white placeholder:text-[#8A8F98] h-11 focus-visible:ring-1 focus-visible:border-primary transition-all rounded-lg"
+                     />
+                     <Button type="submit" size="icon" disabled={!draft.trim()} className="h-11 w-11 accent-button shrink-0 transition-transform active:scale-95 shadow-[0_4px_12px_rgba(94,106,210,0.3)]">
+                        <Send className="h-5 w-5" />
+                     </Button>
+                  </form>
+               </div>
+            </>
+         )}
+      </Card>
     </div>
   );
 };

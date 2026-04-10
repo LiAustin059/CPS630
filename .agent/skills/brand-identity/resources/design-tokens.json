@@ -1,0 +1,40 @@
+{
+    "meta": {
+        "brand_name": "EventHub",
+        "description": "Core design tokens for UI implementation."
+    },
+    "colors": {
+        "primary": {
+            "DEFAULT": "#4F46E5",
+            "hover": "#4338CA",
+            "foreground": "#FFFFFF"
+        },
+        "secondary": {
+            "DEFAULT": "#F8FAFC",
+            "foreground": "#0F172A"
+        },
+        "background": "#FFFFFF",
+        "foreground": "#0F172A",
+        "muted": "#F1F5F9",
+        "accent": "#EEF2FF",
+        "destructive": "#EF4444",
+        "success": "#10B981"
+    },
+    "typography": {
+        "font_family_headings": [
+            "Inter",
+            "sans-serif"
+        ],
+        "font_family_body": [
+            "Inter",
+            "sans-serif"
+        ],
+        "font_weight_bold": "700",
+        "font_weight_normal": "400"
+        },
+    "ui": {
+        "border_radius_default": "0.75rem",
+        "border_radius_small": "0.375rem",
+        "spacing_base_unit": "4px"
+    }
+}
